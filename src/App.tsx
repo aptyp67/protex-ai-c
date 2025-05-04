@@ -50,11 +50,11 @@ function App() {
     isMaxZoom,
     isMinZoom,
     getRelativeCoordinates,
-  } = useAnnotation({ 
-    imageUrl, 
-    fileName, 
+  } = useAnnotation({
+    imageUrl,
+    fileName,
     containerWidth: imageContainerDimensions.width,
-    containerHeight: imageContainerDimensions.height 
+    containerHeight: imageContainerDimensions.height,
   });
 
   useEffect(() => {
@@ -154,7 +154,7 @@ function App() {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const pos = getRelativeCoordinates(e); 
+    const pos = getRelativeCoordinates(e);
     setUnscaledMousePosition(pos);
 
     handleImageContainerMouseMove(e);
@@ -259,7 +259,7 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Image Annotation Tool</h1>
+        <h1>Image Annotation Builder</h1>
         <div className="tool-controls">
           <button
             className={mode === AnnotationMode.SELECT ? "active" : ""}
@@ -378,14 +378,14 @@ function App() {
             onMouseMove={handleMouseMove}
             onMouseUp={handleImageContainerMouseUp}
             onMouseLeave={() => {
-              setUnscaledMousePosition(null); 
+              setUnscaledMousePosition(null);
               handleImageContainerMouseUp();
             }}
             onWheel={handleWheel}
             style={{
               ...getCursorStyle(),
               transform: `scale(${zoomLevel})`,
-              transformOrigin: "top left",
+              transformOrigin: "center center",
             }}
           >
             {imageUrl && (
@@ -395,7 +395,7 @@ function App() {
                   src={imageUrl}
                   alt="Uploaded for annotation"
                   onLoad={handleImageLoadAndDimensions}
-                  draggable={false} 
+                  draggable={false}
                   style={{
                     display: "block",
                     width: "100%",
@@ -408,7 +408,7 @@ function App() {
                   annotations={annotations}
                   tempPoints={tempPoints}
                   selectedAnnotation={selectedAnnotation}
-                  currentMousePosition={unscaledMousePosition} 
+                  currentMousePosition={unscaledMousePosition}
                   mode={mode}
                   zoomLevel={zoomLevel}
                 />

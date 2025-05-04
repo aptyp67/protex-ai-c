@@ -223,7 +223,7 @@ export const useAnnotation = ({
   }, [imageUrl, loadedImageUrl]);
 
   const zoomIn = useCallback(() => {
-    setZoomLevel((prev) => Math.min(prev * 1.2, 1));
+    setZoomLevel((prev) => Math.min(prev * 1.2, 2));
   }, []);
 
   const zoomOut = useCallback(() => {
@@ -234,7 +234,7 @@ export const useAnnotation = ({
     setZoomLevel(1);
   }, []);
 
-  const isMaxZoom = zoomLevel >= 1;
+  const isMaxZoom = zoomLevel >= 2;
   const isMinZoom = zoomLevel <= 0.2;
 
   const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
@@ -244,7 +244,7 @@ export const useAnnotation = ({
       const zoomFactor = delta > 0 ? 1.1 : 0.9;
       setZoomLevel((prevZoom) => {
         const newZoom = prevZoom * zoomFactor;
-        return Math.min(Math.max(newZoom, 0.2), 1);
+        return Math.min(Math.max(newZoom, 0.2), 2);
       });
     }
   }, []);
