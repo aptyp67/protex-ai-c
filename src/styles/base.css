@@ -1,0 +1,127 @@
+:root {
+  --primary-color: #646cff;
+  --primary-hover: #535bf2;
+  --secondary-color: #ff4c4c;
+  --bg-color: #f9f9f9;
+  --text-color: #213547;
+  --border-color: #ddd;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+/* App Layout */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.main-content {
+  flex: 1;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Animation */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 76, 76, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 76, 76, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 76, 76, 0);
+  }
+}
+
+/* Media Queries */
+@media (min-width: 768px) {
+  .header {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+  }
+
+  .export-controls {
+    flex-direction: row;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 767px) {
+  .header h1 {
+    font-size: 1.4rem;
+  }
+
+  .tool-controls button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
+
+  .image-container-wrapper {
+    min-height: 300px;
+  }
+
+  .image-container {
+    min-height: 300px;
+  }
+
+  .export-modal-content {
+    padding: 1rem;
+  }
+
+  .image-uploader {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .zoom-controls-group,
+  .image-uploader .upload-controls {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    padding: 0;
+  }
+
+  .image-uploader:after {
+    top: 50%;
+    left: 10%;
+    right: 10%;
+    bottom: auto;
+    width: auto;
+    height: 1px;
+    transform: translateY(-50%);
+  }
+
+  .zoom-controls-group button {
+    width: 28px;
+    height: 28px;
+  }
+}
