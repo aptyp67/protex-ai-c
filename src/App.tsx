@@ -6,18 +6,20 @@ import "./App.css";
 
 function App() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [containerDimensions, setContainerDimensions] = useState({
-    width: 0,
-    height: 0,
-  });
+  const [fileName, setFileName] = useState<string | null>(null);
   const imageContainerRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportedData, setExportedData] = useState<string | null>(null);
   const [exportType, setExportType] = useState<"json" | "image">("json");
-  const [currentMousePosition, setCurrentMousePosition] =
+  const [unscaledMousePosition, setUnscaledMousePosition] =
     useState<Point | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
+
+  const [imageContainerDimensions, setImageContainerDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
 
   const {
     annotations,
@@ -40,7 +42,6 @@ function App() {
     canRedo,
     completePolygon,
     isDragging,
-    // Include zoom-related properties and functions
     zoomLevel,
     zoomIn,
     zoomOut,
@@ -48,16 +49,26 @@ function App() {
     handleWheel,
     isMaxZoom,
     isMinZoom,
-  } = useAnnotation({ imageUrl });
+    getRelativeCoordinates,
+  } = useAnnotation({ 
+    imageUrl, 
+    fileName, 
+    containerWidth: imageContainerDimensions.width,
+    containerHeight: imageContainerDimensions.height 
+  });
 
   useEffect(() => {
+    const currentImageRef = imageRef.current;
+
     const updateDimensions = () => {
-      if (imageRef.current && imageContainerRef.current) {
-        const img = imageRef.current;
-        setContainerDimensions({
+      if (currentImageRef) {
+        const img = currentImageRef;
+        setImageContainerDimensions({
           width: img.offsetWidth,
           height: img.offsetHeight,
         });
+      } else {
+        setImageContainerDimensions({ width: 0, height: 0 });
       }
     };
 
@@ -65,23 +76,22 @@ function App() {
 
     window.addEventListener("resize", updateDimensions);
 
-    if (imageRef.current) {
-      const resizeObserver = new ResizeObserver(() => {
-        updateDimensions();
-      });
-
-      resizeObserver.observe(imageRef.current);
-
-      return () => {
-        resizeObserver.disconnect();
-        window.removeEventListener("resize", updateDimensions);
-      };
+    let resizeObserver: ResizeObserver | null = null;
+    if (currentImageRef) {
+      resizeObserver = new ResizeObserver(updateDimensions);
+      resizeObserver.observe(currentImageRef);
     }
 
     return () => {
       window.removeEventListener("resize", updateDimensions);
+      if (resizeObserver && currentImageRef) {
+        resizeObserver.unobserve(currentImageRef);
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
     };
-  }, [imageUrl]);
+  }, [imageUrl, zoomLevel]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -95,6 +105,7 @@ function App() {
       URL.revokeObjectURL(imageUrl);
     }
     const newImageUrl = URL.createObjectURL(file);
+    setFileName(file.name);
     setImageUrl(newImageUrl);
   };
 
@@ -143,13 +154,8 @@ function App() {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!imageContainerRef.current) return;
-
-    const rect = imageContainerRef.current.getBoundingClientRect();
-    setCurrentMousePosition({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
+    const pos = getRelativeCoordinates(e); 
+    setUnscaledMousePosition(pos);
 
     handleImageContainerMouseMove(e);
   };
@@ -188,7 +194,6 @@ function App() {
         if (canRedo) redo();
       }
 
-      // Add zoom keyboard shortcuts
       if ((e.ctrlKey || e.metaKey) && e.key === "=") {
         e.preventDefault();
         zoomIn();
@@ -244,9 +249,8 @@ function App() {
     e: React.SyntheticEvent<HTMLImageElement, Event>
   ) => {
     handleImageLoad(e);
-
     const img = e.currentTarget;
-    setContainerDimensions({
+    setImageContainerDimensions({
       width: img.offsetWidth,
       height: img.offsetHeight,
     });
@@ -310,8 +314,6 @@ function App() {
               Redo
             </button>
           </div>
-
-          {/* Removed zoom controls from here */}
         </div>
       </header>
 
@@ -376,11 +378,15 @@ function App() {
             onMouseMove={handleMouseMove}
             onMouseUp={handleImageContainerMouseUp}
             onMouseLeave={() => {
-              setCurrentMousePosition(null);
+              setUnscaledMousePosition(null); 
               handleImageContainerMouseUp();
             }}
-            onWheel={handleWheel} // Add wheel event handler for zoom
-            style={getCursorStyle()}
+            onWheel={handleWheel}
+            style={{
+              ...getCursorStyle(),
+              transform: `scale(${zoomLevel})`,
+              transformOrigin: "top left",
+            }}
           >
             {imageUrl && (
               <>
@@ -389,23 +395,22 @@ function App() {
                   src={imageUrl}
                   alt="Uploaded for annotation"
                   onLoad={handleImageLoadAndDimensions}
+                  draggable={false} 
                   style={{
-                    maxWidth: `${100 * zoomLevel}%`,
-                    maxHeight: `${100 * zoomLevel}%`,
-                    objectFit: "contain",
-                    transformOrigin: "center center",
+                    display: "block",
+                    width: "100%",
+                    height: "100%",
                   }}
-                  draggable="false"
                 />
                 <AnnotationCanvas
-                  width={containerDimensions.width}
-                  height={containerDimensions.height}
+                  containerWidth={imageContainerDimensions.width}
+                  containerHeight={imageContainerDimensions.height}
                   annotations={annotations}
                   tempPoints={tempPoints}
                   selectedAnnotation={selectedAnnotation}
-                  currentMousePosition={currentMousePosition}
+                  currentMousePosition={unscaledMousePosition} 
                   mode={mode}
-                  zoomLevel={zoomLevel} // Pass zoom level to AnnotationCanvas
+                  zoomLevel={zoomLevel}
                 />
               </>
             )}
@@ -426,8 +431,6 @@ function App() {
             )}
           </div>
         </div>
-
-        {/* Removed zoom controls from here */}
 
         {imageUrl && (
           <div className="export-controls">

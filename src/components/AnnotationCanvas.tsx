@@ -3,8 +3,8 @@ import { Annotation, AnnotationType, Point, AnnotationMode } from "../types";
 import { calculateArrowHead } from "../utils/annotation";
 
 interface AnnotationCanvasProps {
-  width: number;
-  height: number;
+  containerWidth: number; 
+  containerHeight: number;
   annotations: Annotation[];
   tempPoints: Point[];
   selectedAnnotation: Annotation | null;
@@ -15,8 +15,8 @@ interface AnnotationCanvasProps {
 }
 
 const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
-  width,
-  height,
+  containerWidth,
+  containerHeight,
   annotations,
   tempPoints,
   selectedAnnotation,
@@ -29,24 +29,23 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || containerWidth === 0 || containerHeight === 0) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = containerWidth;
+    canvas.height = containerHeight;
     
-    ctx.clearRect(0, 0, width, height);
+    ctx.clearRect(0, 0, containerWidth, containerHeight);
 
-    ctx.save();
-    ctx.scale(zoomLevel, zoomLevel);
+    const handleSize = 5 / zoomLevel;
 
     annotations.forEach((annotation) => {
       const isSelected = selectedAnnotation?.id === annotation.id;
 
       ctx.strokeStyle = isSelected ? "#ff0000" : "#00ff00";
-      ctx.lineWidth = isSelected ? 3 / zoomLevel : 2 / zoomLevel;
+      ctx.lineWidth = (isSelected ? 3 : 2) / zoomLevel; 
       ctx.fillStyle = isSelected
         ? "rgba(255, 0, 0, 0.2)"
         : "rgba(0, 255, 0, 0.2)";
@@ -54,10 +53,12 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       if (annotation.type === AnnotationType.POLYGON) {
         if (annotation.points.length < 3) return;
 
-        ctx.beginPath();
-        ctx.moveTo(annotation.points[0].x, annotation.points[0].y);
+        const pointsToDraw = annotation.points; 
 
-        annotation.points.slice(1).forEach((point) => {
+        ctx.beginPath();
+        ctx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
+
+        pointsToDraw.slice(1).forEach((point) => {
           ctx.lineTo(point.x, point.y);
         });
 
@@ -66,9 +67,9 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         ctx.stroke();
 
         if (isSelected) {
-          annotation.points.forEach((point) => {
+          pointsToDraw.forEach((point) => {
             ctx.beginPath();
-            ctx.arc(point.x, point.y, 5 / zoomLevel, 0, Math.PI * 2);
+            ctx.arc(point.x, point.y, handleSize, 0, Math.PI * 2); 
             ctx.fillStyle = "#ff0000";
             ctx.fill();
           });
@@ -76,14 +77,14 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       } else if (annotation.type === AnnotationType.ARROW) {
         if (annotation.points.length !== 2) return;
 
-        const [start, end] = annotation.points;
+        const [start, end] = annotation.points; 
 
         ctx.beginPath();
         ctx.moveTo(start.x, start.y);
         ctx.lineTo(end.x, end.y);
         ctx.stroke();
 
-        const headPoints = calculateArrowHead(start, end, 10 / zoomLevel);
+        const headPoints = calculateArrowHead(start, end, 10 / zoomLevel); 
         ctx.beginPath();
         ctx.moveTo(headPoints[0].x, headPoints[0].y);
         ctx.lineTo(headPoints[1].x, headPoints[1].y);
@@ -94,7 +95,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         if (isSelected) {
           [start, end].forEach((point) => {
             ctx.beginPath();
-            ctx.arc(point.x, point.y, 5 / zoomLevel, 0, Math.PI * 2);
+            ctx.arc(point.x, point.y, handleSize, 0, Math.PI * 2); 
             ctx.fillStyle = "#ff0000";
             ctx.fill();
           });
@@ -106,57 +107,38 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       ctx.strokeStyle = "#00ffff";
       ctx.lineWidth = 2 / zoomLevel;
 
-      ctx.beginPath();
-      ctx.moveTo(tempPoints[0].x, tempPoints[0].y);
+      const pointsToDraw = tempPoints; 
 
-      tempPoints.slice(1).forEach((point) => {
+      ctx.beginPath();
+      ctx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
+
+      pointsToDraw.slice(1).forEach((point) => {
         ctx.lineTo(point.x, point.y);
       });
 
-      if (
-        mode === AnnotationMode.POLYGON &&
-        currentMousePosition &&
-        tempPoints.length > 0
-      ) {
-        const scaledMousePos = {
-          x: currentMousePosition.x / zoomLevel,
-          y: currentMousePosition.y / zoomLevel
-        };
-        
-        ctx.lineTo(scaledMousePos.x, scaledMousePos.y);
+      if (currentMousePosition && tempPoints.length > 0) {
+         const mouseX = currentMousePosition.x / zoomLevel;
+         const mouseY = currentMousePosition.y / zoomLevel;
 
-        if (tempPoints.length > 1) {
-          ctx.lineTo(tempPoints[0].x, tempPoints[0].y);
+        if (mode === AnnotationMode.POLYGON) {
+          ctx.lineTo(mouseX, mouseY);
+        } else if (mode === AnnotationMode.ARROW && tempPoints.length === 1) {
+          ctx.lineTo(mouseX, mouseY);
         }
-      } else if (
-        mode === AnnotationMode.ARROW &&
-        currentMousePosition &&
-        tempPoints.length === 1
-      ) {
-        const scaledMousePos = {
-          x: currentMousePosition.x / zoomLevel,
-          y: currentMousePosition.y / zoomLevel
-        };
-        
-        ctx.lineTo(scaledMousePos.x, scaledMousePos.y);
-      } else if (tempPoints.length > 1) {
-        ctx.lineTo(tempPoints[0].x, tempPoints[0].y);
       }
 
       ctx.stroke();
 
-      tempPoints.forEach((point) => {
+      pointsToDraw.forEach((point) => {
         ctx.beginPath();
-        ctx.arc(point.x, point.y, 4 / zoomLevel, 0, Math.PI * 2);
+        ctx.arc(point.x, point.y, 4 / zoomLevel, 0, Math.PI * 2); 
         ctx.fillStyle = "#00ffff";
         ctx.fill();
       });
     }
-    
-    ctx.restore();
   }, [
-    width,
-    height,
+    containerWidth,
+    containerHeight,
     annotations,
     tempPoints,
     selectedAnnotation,
@@ -168,10 +150,17 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   return (
     <canvas
       ref={canvasRef}
-      width={width}
-      height={height}
+      width={containerWidth} 
+      height={containerHeight}
       className={`annotation-canvas ${className || ''}`}
-      style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
+      style={{ 
+        position: "absolute", 
+        top: 0, 
+        left: 0, 
+        pointerEvents: "none",
+        width: `${containerWidth}px`, 
+        height: `${containerHeight}px`,
+      }}
     />
   );
 };

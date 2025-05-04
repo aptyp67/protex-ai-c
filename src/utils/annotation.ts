@@ -44,11 +44,12 @@ export const calculateScaledPoint = (
 export const isPointNearPoint = (
   p1: Point,
   p2: Point,
-  threshold = 10
+  threshold = 10,
+  zoomLevel = 1
 ): boolean => {
   const dx = p1.x - p2.x;
   const dy = p1.y - p2.y;
-  return Math.sqrt(dx * dx + dy * dy) <= threshold;
+  return Math.sqrt(dx * dx + dy * dy) <= threshold / zoomLevel;
 };
 
 export const isPointInPolygon = (point: Point, polygon: Point[]): boolean => {
@@ -73,13 +74,14 @@ export const isPointNearLine = (
   point: Point,
   lineStart: Point,
   lineEnd: Point,
-  threshold = 5
+  threshold = 5,
+  zoomLevel = 1
 ): boolean => {
   const lineLength = Math.sqrt(
     Math.pow(lineEnd.x - lineStart.x, 2) + Math.pow(lineEnd.y - lineStart.y, 2)
   );
 
-  if (lineLength === 0) return isPointNearPoint(point, lineStart, threshold);
+  if (lineLength === 0) return isPointNearPoint(point, lineStart, threshold, zoomLevel);
 
   const t =
     ((point.x - lineStart.x) * (lineEnd.x - lineStart.x) +
@@ -87,11 +89,11 @@ export const isPointNearLine = (
     (lineLength * lineLength);
 
   if (t < 0) {
-    return isPointNearPoint(point, lineStart, threshold);
+    return isPointNearPoint(point, lineStart, threshold, zoomLevel);
   }
 
   if (t > 1) {
-    return isPointNearPoint(point, lineEnd, threshold);
+    return isPointNearPoint(point, lineEnd, threshold, zoomLevel);
   }
 
   const closestPoint = {
@@ -99,7 +101,7 @@ export const isPointNearLine = (
     y: lineStart.y + t * (lineEnd.y - lineStart.y),
   };
 
-  return isPointNearPoint(point, closestPoint, threshold);
+  return isPointNearPoint(point, closestPoint, threshold, zoomLevel);
 };
 
 export const calculateAngle = (p1: Point, p2: Point): number => {
@@ -137,4 +139,13 @@ export const findSelectedPointIndex = (
     }
   }
   return -1;
+};
+
+export const generateImageKey = (
+  imageUrl: string,
+  width: number,
+  height: number
+): string => {
+  const fileName = imageUrl.split('/').pop()?.split('#')[0]?.split('?')[0] || '';
+  return `${fileName}_${width}x${height}`;
 };

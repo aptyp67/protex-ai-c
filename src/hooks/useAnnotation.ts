@@ -13,10 +13,21 @@ import {
   isPointInPolygon,
   isPointNearLine,
   calculateScaledPoint,
+  generateImageKey,
 } from "../utils/annotation";
 
 interface UseAnnotationProps {
   imageUrl: string | null;
+  fileName: string | null;
+  containerWidth: number;
+  containerHeight: number;
+}
+
+interface StoredAnnotations {
+  annotations: Annotation[];
+  timestamp: number;
+  naturalWidth: number;
+  naturalHeight: number;
 }
 
 interface UseAnnotationReturn {
@@ -51,6 +62,8 @@ interface UseAnnotationReturn {
   handleWheel: (e: React.WheelEvent<HTMLDivElement>) => void;
   isMaxZoom: boolean;
   isMinZoom: boolean;
+  clearAllAnnotations: () => void;
+  getRelativeCoordinates: (e: React.MouseEvent<HTMLDivElement>) => Point;
 }
 
 interface AnnotationHistoryState {
@@ -59,8 +72,13 @@ interface AnnotationHistoryState {
   selectedPointIndex: number | null;
 }
 
+const STORAGE_KEY_PREFIX = "protexai-annotations-";
+
 export const useAnnotation = ({
   imageUrl,
+  fileName,
+  containerWidth,
+  containerHeight,
 }: UseAnnotationProps): UseAnnotationReturn => {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [tempPoints, setTempPoints] = useState<Point[]>([]);
@@ -78,6 +96,7 @@ export const useAnnotation = ({
   const [imageNaturalHeight, setImageNaturalHeight] = useState<number>(0);
   const [loadedImageUrl, setLoadedImageUrl] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [currentImageKey, setCurrentImageKey] = useState<string | null>(null);
 
   const [history, setHistory] = useState<AnnotationHistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
@@ -85,6 +104,7 @@ export const useAnnotation = ({
   const [canRedo, setCanRedo] = useState<boolean>(false);
 
   const skipHistoryRef = useRef(false);
+  const skipSavingRef = useRef(false);
 
   const startDragPointRef = useRef<Point | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -99,6 +119,25 @@ export const useAnnotation = ({
     setCanUndo(historyIndex > 0);
     setCanRedo(historyIndex < history.length - 1);
   }, [history, historyIndex]);
+
+  useEffect(() => {
+    if (currentImageKey && !skipSavingRef.current && annotations.length > 0) {
+      const dataToStore: StoredAnnotations = {
+        annotations,
+        timestamp: Date.now(),
+        naturalWidth: imageNaturalWidth,
+        naturalHeight: imageNaturalHeight,
+      };
+      localStorage.setItem(
+        `${STORAGE_KEY_PREFIX}${currentImageKey}`,
+        JSON.stringify(dataToStore)
+      );
+    }
+
+    if (skipSavingRef.current) {
+      skipSavingRef.current = false;
+    }
+  }, [annotations, currentImageKey, imageNaturalWidth, imageNaturalHeight]);
 
   const undo = useCallback(() => {
     if (historyIndex > 0) {
@@ -173,7 +212,6 @@ export const useAnnotation = ({
 
   useEffect(() => {
     if (imageUrl !== loadedImageUrl) {
-      setAnnotations([]);
       setTempPoints([]);
       setSelectedAnnotation(null);
       setSelectedPointIndex(null);
@@ -216,9 +254,13 @@ export const useAnnotation = ({
       if (!e.currentTarget) return { x: 0, y: 0 };
 
       const rect = e.currentTarget.getBoundingClientRect();
+
+      const rawX = e.clientX - rect.left;
+      const rawY = e.clientY - rect.top;
+
       return {
-        x: (e.clientX - rect.left) / zoomLevel,
-        y: (e.clientY - rect.top) / zoomLevel,
+        x: rawX / zoomLevel,
+        y: rawY / zoomLevel,
       };
     },
     [zoomLevel]
@@ -227,12 +269,58 @@ export const useAnnotation = ({
   const handleImageLoad = useCallback(
     (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
       const img = e.currentTarget;
+      const naturalWidth = img.naturalWidth;
+      const naturalHeight = img.naturalHeight;
+
       setImageElement(img);
-      setImageNaturalWidth(img.naturalWidth);
-      setImageNaturalHeight(img.naturalHeight);
+      setImageNaturalWidth(naturalWidth);
+      setImageNaturalHeight(naturalHeight);
+
+      let imageKey;
+      if (fileName) {
+        imageKey = `${fileName}_${naturalWidth}x${naturalHeight}`;
+      } else {
+        imageKey = generateImageKey(img.src, naturalWidth, naturalHeight);
+      }
+
+      console.log("Using storage key:", imageKey);
+      setCurrentImageKey(imageKey);
+
+      try {
+        const storedData = localStorage.getItem(
+          `${STORAGE_KEY_PREFIX}${imageKey}`
+        );
+        if (storedData) {
+          const parsedData: StoredAnnotations = JSON.parse(storedData);
+
+          if (
+            parsedData.naturalWidth === naturalWidth &&
+            parsedData.naturalHeight === naturalHeight
+          ) {
+            skipSavingRef.current = true;
+            setAnnotations(parsedData.annotations);
+            console.log(
+              "Loaded annotations from localStorage:",
+              parsedData.annotations.length
+            );
+          } else {
+            console.log(
+              "Image dimensions do not match stored dimensions, resetting annotations"
+            );
+            setAnnotations([]);
+          }
+        } else {
+          console.log("No stored annotations found for this image");
+          setAnnotations([]);
+        }
+      } catch (error) {
+        console.error("Error loading annotations from localStorage:", error);
+        setAnnotations([]);
+      }
+
       setLoadedImageUrl(img.src);
     },
-    []
+    [fileName]
   );
 
   const handleImageContainerClick = useCallback(
@@ -244,7 +332,10 @@ export const useAnnotation = ({
         setTempPoints((prevPoints) => {
           const newTempPoints = [...prevPoints, point];
 
-          if (prevPoints.length > 1 && isPointNearPoint(point, prevPoints[0])) {
+          if (
+            prevPoints.length > 1 &&
+            isPointNearPoint(point, prevPoints[0], 10, zoomLevel)
+          ) {
             const closedPolygonPoints = [...prevPoints];
             if (closedPolygonPoints.length >= 3) {
               const newPolygonAnnotation =
@@ -275,7 +366,7 @@ export const useAnnotation = ({
         for (let i = 0; i < currentAnnotations.length; i++) {
           const annotation = currentAnnotations[i];
           for (let j = 0; j < annotation.points.length; j++) {
-            if (isPointNearPoint(point, annotation.points[j])) {
+            if (isPointNearPoint(point, annotation.points[j], 10, zoomLevel)) {
               setSelectedAnnotation(annotation);
               setSelectedPointIndex(j);
               found = true;
@@ -303,7 +394,9 @@ export const useAnnotation = ({
                 isPointNearLine(
                   point,
                   annotation.points[0],
-                  annotation.points[1]
+                  annotation.points[1],
+                  5,
+                  zoomLevel
                 )
               ) {
                 setSelectedAnnotation(annotation);
@@ -323,7 +416,7 @@ export const useAnnotation = ({
         }
       }
     },
-    [mode, getRelativeCoordinates]
+    [mode, getRelativeCoordinates, zoomLevel]
   );
 
   const handleImageContainerMouseMove = useCallback(
@@ -450,10 +543,10 @@ export const useAnnotation = ({
   ]);
 
   const exportAnnotations = useCallback((): ExportedAnnotations => {
-    if (!imageElement) {
+    if (!imageElement || containerWidth === 0 || containerHeight === 0) {
       return {
-        imageWidth: 0,
-        imageHeight: 0,
+        imageWidth: imageNaturalWidth,
+        imageHeight: imageNaturalHeight,
         annotations: [],
         metadata: {
           timestamp: Date.now(),
@@ -463,8 +556,9 @@ export const useAnnotation = ({
       };
     }
 
-    const containerWidth = imageElement.width * zoomLevel;
-    const containerHeight = imageElement.height * zoomLevel;
+    const currentUnscaledWidth = containerWidth;
+    const currentUnscaledHeight = containerHeight;
+
     const currentAnnotations = annotationsRef.current;
 
     const exportedAnnotations = currentAnnotations.map((annotation) => {
@@ -473,14 +567,23 @@ export const useAnnotation = ({
           point,
           imageNaturalWidth,
           imageNaturalHeight,
-          containerWidth / zoomLevel,
-          containerHeight / zoomLevel
+          currentUnscaledWidth,
+          currentUnscaledHeight
         );
 
         const normalizedCoordinates = {
           x: pixelCoordinates.x / imageNaturalWidth,
           y: pixelCoordinates.y / imageNaturalHeight,
         };
+
+        normalizedCoordinates.x = Math.max(
+          0,
+          Math.min(1, normalizedCoordinates.x)
+        );
+        normalizedCoordinates.y = Math.max(
+          0,
+          Math.min(1, normalizedCoordinates.y)
+        );
 
         return {
           pixelCoordinates,
@@ -505,10 +608,18 @@ export const useAnnotation = ({
         exportDate: new Date().toISOString(),
       },
     };
-  }, [imageElement, imageNaturalWidth, imageNaturalHeight, zoomLevel]);
+  }, [
+    imageElement,
+    imageNaturalWidth,
+    imageNaturalHeight,
+    containerWidth,
+    containerHeight,
+  ]);
 
   const exportAnnotationsAsImage = useCallback((): string => {
-    if (!imageElement) return "";
+    if (!imageElement || containerWidth === 0 || containerHeight === 0)
+      return "";
+
     const currentAnnotations = annotationsRef.current;
 
     if (!canvasRef.current) {
@@ -524,8 +635,8 @@ export const useAnnotation = ({
 
     ctx.drawImage(imageElement, 0, 0, imageNaturalWidth, imageNaturalHeight);
 
-    const containerWidth = imageElement.width * zoomLevel;
-    const containerHeight = imageElement.height * zoomLevel;
+    const currentUnscaledWidth = containerWidth;
+    const currentUnscaledHeight = containerHeight;
 
     currentAnnotations.forEach((annotation) => {
       const scaledPoints = annotation.points.map((point) =>
@@ -533,8 +644,8 @@ export const useAnnotation = ({
           point,
           imageNaturalWidth,
           imageNaturalHeight,
-          containerWidth / zoomLevel,
-          containerHeight / zoomLevel
+          currentUnscaledWidth,
+          currentUnscaledHeight
         )
       );
 
@@ -542,13 +653,12 @@ export const useAnnotation = ({
       ctx.lineWidth = 2;
 
       if (annotation.type === AnnotationType.POLYGON) {
+        if (scaledPoints.length < 3) return;
         ctx.beginPath();
         ctx.moveTo(scaledPoints[0].x, scaledPoints[0].y);
-
         scaledPoints.slice(1).forEach((point) => {
           ctx.lineTo(point.x, point.y);
         });
-
         ctx.closePath();
         ctx.fillStyle = "rgba(0, 255, 0, 0.2)";
         ctx.fill();
@@ -556,14 +666,13 @@ export const useAnnotation = ({
       } else if (annotation.type === AnnotationType.ARROW) {
         if (scaledPoints.length === 2) {
           const [start, end] = scaledPoints;
-
           ctx.beginPath();
           ctx.moveTo(start.x, start.y);
           ctx.lineTo(end.x, end.y);
           ctx.stroke();
 
           const angle = Math.atan2(end.y - start.y, end.x - start.x);
-          const headLength = 20;
+          const headLength = 15;
 
           ctx.beginPath();
           ctx.moveTo(end.x, end.y);
@@ -581,8 +690,14 @@ export const useAnnotation = ({
       }
     });
 
-    return canvas.toDataURL();
-  }, [imageElement, imageNaturalWidth, imageNaturalHeight, zoomLevel]);
+    return canvas.toDataURL("image/png");
+  }, [
+    imageElement,
+    imageNaturalWidth,
+    imageNaturalHeight,
+    containerWidth,
+    containerHeight,
+  ]);
 
   const completePolygon = useCallback(() => {
     if (mode === AnnotationMode.POLYGON && tempPoints.length >= 3) {
@@ -592,6 +707,17 @@ export const useAnnotation = ({
       setTempPoints([]);
     }
   }, [mode, tempPoints]);
+
+  const clearAllAnnotations = useCallback(() => {
+    setAnnotations([]);
+    setTempPoints([]);
+    setSelectedAnnotation(null);
+    setSelectedPointIndex(null);
+
+    if (currentImageKey) {
+      localStorage.removeItem(`${STORAGE_KEY_PREFIX}${currentImageKey}`);
+    }
+  }, [currentImageKey]);
 
   return {
     annotations,
@@ -625,5 +751,7 @@ export const useAnnotation = ({
     handleWheel,
     isMaxZoom,
     isMinZoom,
+    clearAllAnnotations,
+    getRelativeCoordinates,
   };
 };
