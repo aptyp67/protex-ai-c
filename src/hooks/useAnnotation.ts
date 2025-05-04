@@ -42,6 +42,7 @@ interface UseAnnotationReturn {
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  completePolygon: () => void;
 }
 
 interface AnnotationHistoryState {
@@ -497,6 +498,15 @@ export const useAnnotation = ({
     return canvas.toDataURL();
   }, [imageElement, imageNaturalWidth, imageNaturalHeight]);
 
+  const completePolygon = useCallback(() => {
+    if (mode === AnnotationMode.POLYGON && tempPoints.length >= 3) {
+      const newPolygonAnnotation = createPolygonAnnotation(tempPoints);
+      setAnnotations((prev) => [...prev, newPolygonAnnotation]);
+
+      setTempPoints([]);
+    }
+  }, [mode, tempPoints]);
+
   return {
     annotations,
     tempPoints,
@@ -520,5 +530,6 @@ export const useAnnotation = ({
     redo,
     canUndo,
     canRedo,
+    completePolygon,
   };
 };

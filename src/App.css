@@ -89,6 +89,20 @@ body {
   border-color: var(--primary-color);
 }
 
+.tool-controls button.finish-button {
+  background-color: var(--secondary-color);
+  color: white;
+  border-color: var(--secondary-color);
+  font-weight: bold;
+  animation: pulse 1.5s infinite;
+  box-shadow: 0 0 8px rgba(255, 76, 76, 0.4);
+}
+
+.tool-controls button.finish-button:hover {
+  background-color: #ff3333;
+  border-color: #ff3333;
+}
+
 .main-content {
   flex: 1;
   padding: 1rem;
@@ -360,6 +374,18 @@ body {
 @media (prefers-reduced-motion: no-preference) {
   a:nth-of-type(2) .logo {
     animation: logo-spin infinite 20s linear;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 76, 76, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 76, 76, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 76, 76, 0);
   }
 }
 

@@ -11,6 +11,7 @@ function App() {
     height: 0,
   });
   const imageContainerRef = useRef<HTMLDivElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportedData, setExportedData] = useState<string | null>(null);
   const [exportType, setExportType] = useState<"json" | "image">("json");
@@ -35,18 +36,37 @@ function App() {
     redo,
     canUndo,
     canRedo,
+    completePolygon,
+    isDragging,
   } = useAnnotation({ imageUrl });
 
   useEffect(() => {
     const updateDimensions = () => {
-      if (imageContainerRef.current) {
-        const { clientWidth, clientHeight } = imageContainerRef.current;
-        setContainerDimensions({ width: clientWidth, height: clientHeight });
+      if (imageRef.current && imageContainerRef.current) {
+        const img = imageRef.current;
+        setContainerDimensions({
+          width: img.offsetWidth,
+          height: img.offsetHeight,
+        });
       }
     };
 
     updateDimensions();
+
     window.addEventListener("resize", updateDimensions);
+
+    if (imageRef.current) {
+      const resizeObserver = new ResizeObserver(() => {
+        updateDimensions();
+      });
+
+      resizeObserver.observe(imageRef.current);
+
+      return () => {
+        resizeObserver.disconnect();
+        window.removeEventListener("resize", updateDimensions);
+      };
+    }
 
     return () => {
       window.removeEventListener("resize", updateDimensions);
@@ -105,6 +125,16 @@ function App() {
       if (e.key === "Escape") {
         resetAnnotation();
       }
+      if (e.key === "Enter") {
+        if (mode === AnnotationMode.POLYGON && tempPoints.length >= 3) {
+          e.preventDefault();
+          completePolygon();
+        } else if (mode === AnnotationMode.SELECT && isDragging) {
+          e.preventDefault();
+          handleImageContainerMouseUp();
+          resetAnnotation();
+        }
+      }
 
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
         e.preventDefault();
@@ -132,6 +162,11 @@ function App() {
     canRedo,
     undo,
     redo,
+    completePolygon,
+    mode,
+    tempPoints,
+    isDragging,
+    handleImageContainerMouseUp,
   ]);
 
   const getCursorStyle = (): React.CSSProperties => {
@@ -147,6 +182,18 @@ function App() {
       default:
         return { cursor: "default" };
     }
+  };
+
+  const handleImageLoadAndDimensions = (
+    e: React.SyntheticEvent<HTMLImageElement, Event>
+  ) => {
+    handleImageLoad(e);
+
+    const img = e.currentTarget;
+    setContainerDimensions({
+      width: img.offsetWidth,
+      height: img.offsetHeight,
+    });
   };
 
   return (
@@ -172,9 +219,12 @@ function App() {
           >
             Arrow
           </button>
-          <button onClick={resetAnnotation} disabled={tempPoints.length === 0}>
-            Cancel
-          </button>
+          {mode === AnnotationMode.POLYGON && tempPoints.length >= 3 && (
+            <button onClick={completePolygon} className="finish-button">
+              Finish Polygon (or Press Enter)
+            </button>
+          )}
+
           <button
             onClick={deleteSelectedAnnotation}
             disabled={!selectedAnnotation}
@@ -221,9 +271,10 @@ function App() {
             {imageUrl && (
               <>
                 <img
+                  ref={imageRef}
                   src={imageUrl}
                   alt="Uploaded for annotation"
-                  onLoad={handleImageLoad}
+                  onLoad={handleImageLoadAndDimensions}
                   style={{
                     width: "100%",
                     height: "100%",
@@ -326,7 +377,8 @@ function App() {
         <p className="instructions">
           <strong>Instructions:</strong> Select a mode (Polygon/Arrow), click on
           the image to create annotations. Use Select mode to edit or move
-          annotations.
+          annotations. Press Enter to complete a polygon or to finish moving an
+          object.
         </p>
       </footer>
     </div>
