@@ -40,6 +40,14 @@ function App() {
     canRedo,
     completePolygon,
     isDragging,
+    // Include zoom-related properties and functions
+    zoomLevel,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    handleWheel,
+    isMaxZoom,
+    isMinZoom,
   } = useAnnotation({ imageUrl });
 
   useEffect(() => {
@@ -109,7 +117,7 @@ function App() {
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
-      if (file.type.startsWith('image/')) {
+      if (file.type.startsWith("image/")) {
         processImageFile(file);
       }
     }
@@ -179,6 +187,20 @@ function App() {
         e.preventDefault();
         if (canRedo) redo();
       }
+
+      // Add zoom keyboard shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.key === "=") {
+        e.preventDefault();
+        zoomIn();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "-") {
+        e.preventDefault();
+        zoomOut();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+        e.preventDefault();
+        resetZoom();
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -198,6 +220,9 @@ function App() {
     tempPoints,
     isDragging,
     handleImageContainerMouseUp,
+    zoomIn,
+    zoomOut,
+    resetZoom,
   ]);
 
   const getCursorStyle = (): React.CSSProperties => {
@@ -262,13 +287,15 @@ function App() {
           >
             Delete Annotation
           </button>
-          
+
           <button
             onClick={deleteSelectedPoint}
             disabled={
-              !selectedAnnotation || 
-              !(selectedAnnotation.type === AnnotationType.POLYGON && 
-              selectedAnnotation.points.length > 3)
+              !selectedAnnotation ||
+              !(
+                selectedAnnotation.type === AnnotationType.POLYGON &&
+                selectedAnnotation.points.length > 3
+              )
             }
             title="Delete selected point (works when a point is selected and polygon has more than 3 points)"
           >
@@ -283,25 +310,61 @@ function App() {
               Redo
             </button>
           </div>
+
+          {/* Removed zoom controls from here */}
         </div>
       </header>
 
       <main className="main-content">
         <div className="image-uploader">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileUpload}
-            id="image-upload"
-          />
-          <label htmlFor="image-upload" className="upload-button">
-            {imageUrl ? "Change Image" : "Upload Image"}
-          </label>
-          <p className="drag-drop-info">or drag and drop an image here</p>
+          {imageUrl && (
+            <div className="zoom-controls-group">
+              <button
+                onClick={zoomOut}
+                disabled={isMinZoom}
+                title="Zoom Out (Ctrl+-)"
+                className={isMinZoom ? "disabled" : ""}
+              >
+                -
+              </button>
+              <span className="zoom-level">
+                {Math.round(zoomLevel * 100)}%{isMaxZoom && " (Max)"}
+              </span>
+              <button
+                onClick={zoomIn}
+                disabled={isMaxZoom}
+                title="Zoom In (Ctrl+=)"
+                className={isMaxZoom ? "disabled" : ""}
+              >
+                +
+              </button>
+              <button
+                onClick={resetZoom}
+                disabled={zoomLevel === 1}
+                title="Reset Zoom (Ctrl+0)"
+                className="reset-zoom"
+              >
+                Reset
+              </button>
+            </div>
+          )}
+          <div className="upload-controls">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              id="image-upload"
+            />
+            <label htmlFor="image-upload" className="upload-button">
+              {imageUrl ? "Change Image" : "Upload Image"}
+            </label>
+          </div>
         </div>
 
-        <div 
-          className={`image-container-wrapper ${isDraggingFile ? 'dragging' : ''}`}
+        <div
+          className={`image-container-wrapper ${
+            isDraggingFile ? "dragging" : ""
+          }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -316,6 +379,7 @@ function App() {
               setCurrentMousePosition(null);
               handleImageContainerMouseUp();
             }}
+            onWheel={handleWheel} // Add wheel event handler for zoom
             style={getCursorStyle()}
           >
             {imageUrl && (
@@ -326,9 +390,10 @@ function App() {
                   alt="Uploaded for annotation"
                   onLoad={handleImageLoadAndDimensions}
                   style={{
-                    width: "100%",
-                    height: "100%",
+                    maxWidth: `${100 * zoomLevel}%`,
+                    maxHeight: `${100 * zoomLevel}%`,
                     objectFit: "contain",
+                    transformOrigin: "center center",
                   }}
                   draggable="false"
                 />
@@ -340,6 +405,7 @@ function App() {
                   selectedAnnotation={selectedAnnotation}
                   currentMousePosition={currentMousePosition}
                   mode={mode}
+                  zoomLevel={zoomLevel} // Pass zoom level to AnnotationCanvas
                 />
               </>
             )}
@@ -347,7 +413,9 @@ function App() {
               <div className="placeholder">
                 <p>Please upload an image to start annotating</p>
                 <p className="drag-drop-placeholder">
-                  {isDraggingFile ? "Drop image here" : (
+                  {isDraggingFile ? (
+                    "Drop image here"
+                  ) : (
                     <>
                       <br />
                       or drag and drop an image here
@@ -358,6 +426,8 @@ function App() {
             )}
           </div>
         </div>
+
+        {/* Removed zoom controls from here */}
 
         {imageUrl && (
           <div className="export-controls">
@@ -433,11 +503,13 @@ function App() {
       <footer className="footer">
         <p>Image Annotation Tool - Home assignment for ProtexAI</p>
         <p className="instructions">
-          <strong>Instructions:</strong> Upload an image using the button or drag-and-drop.
-          Select a mode (Polygon/Arrow), click on the image to create annotations. 
-          Use Select mode to edit or move annotations. Select a point and press Delete key 
-          or use Delete Point button to remove individual polygon points. 
-          Press Enter to complete a polygon or to finish moving an object.
+          <strong>Instructions:</strong> Upload an image using the button or
+          drag-and-drop. Select a mode (Polygon/Arrow), click on the image to
+          create annotations. Use Select mode to edit or move annotations.
+          Select a point and press Delete key or use Delete Point button to
+          remove individual polygon points. Press Enter to complete a polygon or
+          to finish moving an object. Use zoom controls or Ctrl+mouse wheel to
+          zoom in and out.
         </p>
       </footer>
     </div>

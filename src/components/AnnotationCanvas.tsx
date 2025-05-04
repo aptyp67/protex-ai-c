@@ -11,6 +11,7 @@ interface AnnotationCanvasProps {
   className?: string;
   currentMousePosition?: Point | null;
   mode: AnnotationMode;
+  zoomLevel: number;
 }
 
 const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
@@ -22,6 +23,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   className,
   currentMousePosition,
   mode,
+  zoomLevel,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -32,13 +34,19 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    canvas.width = width;
+    canvas.height = height;
+    
     ctx.clearRect(0, 0, width, height);
+
+    ctx.save();
+    ctx.scale(zoomLevel, zoomLevel);
 
     annotations.forEach((annotation) => {
       const isSelected = selectedAnnotation?.id === annotation.id;
 
       ctx.strokeStyle = isSelected ? "#ff0000" : "#00ff00";
-      ctx.lineWidth = isSelected ? 3 : 2;
+      ctx.lineWidth = isSelected ? 3 / zoomLevel : 2 / zoomLevel;
       ctx.fillStyle = isSelected
         ? "rgba(255, 0, 0, 0.2)"
         : "rgba(0, 255, 0, 0.2)";
@@ -60,7 +68,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         if (isSelected) {
           annotation.points.forEach((point) => {
             ctx.beginPath();
-            ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+            ctx.arc(point.x, point.y, 5 / zoomLevel, 0, Math.PI * 2);
             ctx.fillStyle = "#ff0000";
             ctx.fill();
           });
@@ -75,7 +83,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         ctx.lineTo(end.x, end.y);
         ctx.stroke();
 
-        const headPoints = calculateArrowHead(start, end, 10);
+        const headPoints = calculateArrowHead(start, end, 10 / zoomLevel);
         ctx.beginPath();
         ctx.moveTo(headPoints[0].x, headPoints[0].y);
         ctx.lineTo(headPoints[1].x, headPoints[1].y);
@@ -86,7 +94,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         if (isSelected) {
           [start, end].forEach((point) => {
             ctx.beginPath();
-            ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+            ctx.arc(point.x, point.y, 5 / zoomLevel, 0, Math.PI * 2);
             ctx.fillStyle = "#ff0000";
             ctx.fill();
           });
@@ -96,7 +104,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
     if (tempPoints.length > 0) {
       ctx.strokeStyle = "#00ffff";
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2 / zoomLevel;
 
       ctx.beginPath();
       ctx.moveTo(tempPoints[0].x, tempPoints[0].y);
@@ -110,7 +118,12 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         currentMousePosition &&
         tempPoints.length > 0
       ) {
-        ctx.lineTo(currentMousePosition.x, currentMousePosition.y);
+        const scaledMousePos = {
+          x: currentMousePosition.x / zoomLevel,
+          y: currentMousePosition.y / zoomLevel
+        };
+        
+        ctx.lineTo(scaledMousePos.x, scaledMousePos.y);
 
         if (tempPoints.length > 1) {
           ctx.lineTo(tempPoints[0].x, tempPoints[0].y);
@@ -120,7 +133,12 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         currentMousePosition &&
         tempPoints.length === 1
       ) {
-        ctx.lineTo(currentMousePosition.x, currentMousePosition.y);
+        const scaledMousePos = {
+          x: currentMousePosition.x / zoomLevel,
+          y: currentMousePosition.y / zoomLevel
+        };
+        
+        ctx.lineTo(scaledMousePos.x, scaledMousePos.y);
       } else if (tempPoints.length > 1) {
         ctx.lineTo(tempPoints[0].x, tempPoints[0].y);
       }
@@ -129,11 +147,13 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
       tempPoints.forEach((point) => {
         ctx.beginPath();
-        ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+        ctx.arc(point.x, point.y, 4 / zoomLevel, 0, Math.PI * 2);
         ctx.fillStyle = "#00ffff";
         ctx.fill();
       });
     }
+    
+    ctx.restore();
   }, [
     width,
     height,
@@ -142,6 +162,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     selectedAnnotation,
     currentMousePosition,
     mode,
+    zoomLevel,
   ]);
 
   return (
@@ -149,7 +170,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       ref={canvasRef}
       width={width}
       height={height}
-      className={className}
+      className={`annotation-canvas ${className || ''}`}
       style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
     />
   );

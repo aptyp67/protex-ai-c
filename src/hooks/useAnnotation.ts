@@ -44,6 +44,13 @@ interface UseAnnotationReturn {
   canUndo: boolean;
   canRedo: boolean;
   completePolygon: () => void;
+  zoomLevel: number;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetZoom: () => void;
+  handleWheel: (e: React.WheelEvent<HTMLDivElement>) => void;
+  isMaxZoom: boolean;
+  isMinZoom: boolean;
 }
 
 interface AnnotationHistoryState {
@@ -70,6 +77,7 @@ export const useAnnotation = ({
   const [imageNaturalWidth, setImageNaturalWidth] = useState<number>(0);
   const [imageNaturalHeight, setImageNaturalHeight] = useState<number>(0);
   const [loadedImageUrl, setLoadedImageUrl] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
 
   const [history, setHistory] = useState<AnnotationHistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
@@ -172,8 +180,36 @@ export const useAnnotation = ({
       setIsDragging(false);
       setHistory([]);
       setHistoryIndex(-1);
+      setZoomLevel(1);
     }
   }, [imageUrl, loadedImageUrl]);
+
+  const zoomIn = useCallback(() => {
+    setZoomLevel((prev) => Math.min(prev * 1.2, 1));
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setZoomLevel((prev) => Math.max(prev / 1.2, 0.2));
+  }, []);
+
+  const resetZoom = useCallback(() => {
+    setZoomLevel(1);
+  }, []);
+
+  const isMaxZoom = zoomLevel >= 1;
+  const isMinZoom = zoomLevel <= 0.2;
+
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = -e.deltaY || e.deltaX;
+      const zoomFactor = delta > 0 ? 1.1 : 0.9;
+      setZoomLevel((prevZoom) => {
+        const newZoom = prevZoom * zoomFactor;
+        return Math.min(Math.max(newZoom, 0.2), 1);
+      });
+    }
+  }, []);
 
   const getRelativeCoordinates = useCallback(
     (e: React.MouseEvent<HTMLDivElement>): Point => {
@@ -181,11 +217,11 @@ export const useAnnotation = ({
 
       const rect = e.currentTarget.getBoundingClientRect();
       return {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        x: (e.clientX - rect.left) / zoomLevel,
+        y: (e.clientY - rect.top) / zoomLevel,
       };
     },
-    []
+    [zoomLevel]
   );
 
   const handleImageLoad = useCallback(
@@ -427,8 +463,8 @@ export const useAnnotation = ({
       };
     }
 
-    const containerWidth = imageElement.width;
-    const containerHeight = imageElement.height;
+    const containerWidth = imageElement.width * zoomLevel;
+    const containerHeight = imageElement.height * zoomLevel;
     const currentAnnotations = annotationsRef.current;
 
     const exportedAnnotations = currentAnnotations.map((annotation) => {
@@ -437,8 +473,8 @@ export const useAnnotation = ({
           point,
           imageNaturalWidth,
           imageNaturalHeight,
-          containerWidth,
-          containerHeight
+          containerWidth / zoomLevel,
+          containerHeight / zoomLevel
         );
 
         const normalizedCoordinates = {
@@ -469,7 +505,7 @@ export const useAnnotation = ({
         exportDate: new Date().toISOString(),
       },
     };
-  }, [imageElement, imageNaturalWidth, imageNaturalHeight]);
+  }, [imageElement, imageNaturalWidth, imageNaturalHeight, zoomLevel]);
 
   const exportAnnotationsAsImage = useCallback((): string => {
     if (!imageElement) return "";
@@ -488,8 +524,8 @@ export const useAnnotation = ({
 
     ctx.drawImage(imageElement, 0, 0, imageNaturalWidth, imageNaturalHeight);
 
-    const containerWidth = imageElement.width;
-    const containerHeight = imageElement.height;
+    const containerWidth = imageElement.width * zoomLevel;
+    const containerHeight = imageElement.height * zoomLevel;
 
     currentAnnotations.forEach((annotation) => {
       const scaledPoints = annotation.points.map((point) =>
@@ -497,8 +533,8 @@ export const useAnnotation = ({
           point,
           imageNaturalWidth,
           imageNaturalHeight,
-          containerWidth,
-          containerHeight
+          containerWidth / zoomLevel,
+          containerHeight / zoomLevel
         )
       );
 
@@ -546,7 +582,7 @@ export const useAnnotation = ({
     });
 
     return canvas.toDataURL();
-  }, [imageElement, imageNaturalWidth, imageNaturalHeight]);
+  }, [imageElement, imageNaturalWidth, imageNaturalHeight, zoomLevel]);
 
   const completePolygon = useCallback(() => {
     if (mode === AnnotationMode.POLYGON && tempPoints.length >= 3) {
@@ -582,5 +618,12 @@ export const useAnnotation = ({
     canUndo,
     canRedo,
     completePolygon,
+    zoomLevel,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    handleWheel,
+    isMaxZoom,
+    isMinZoom,
   };
 };
