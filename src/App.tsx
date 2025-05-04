@@ -17,6 +17,7 @@ function App() {
   const [exportType, setExportType] = useState<"json" | "image">("json");
   const [currentMousePosition, setCurrentMousePosition] =
     useState<Point | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
 
   const {
     annotations,
@@ -77,11 +78,40 @@ function App() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (imageUrl) {
-        URL.revokeObjectURL(imageUrl);
+      processImageFile(file);
+    }
+  };
+
+  const processImageFile = (file: File) => {
+    if (imageUrl) {
+      URL.revokeObjectURL(imageUrl);
+    }
+    const newImageUrl = URL.createObjectURL(file);
+    setImageUrl(newImageUrl);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith('image/')) {
+        processImageFile(file);
       }
-      const newImageUrl = URL.createObjectURL(file);
-      setImageUrl(newImageUrl);
     }
   };
 
@@ -267,9 +297,15 @@ function App() {
           <label htmlFor="image-upload" className="upload-button">
             {imageUrl ? "Change Image" : "Upload Image"}
           </label>
+          <p className="drag-drop-info">or drag and drop an image here</p>
         </div>
 
-        <div className="image-container-wrapper">
+        <div 
+          className={`image-container-wrapper ${isDraggingFile ? 'dragging' : ''}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <div
             ref={imageContainerRef}
             className="image-container"
@@ -310,6 +346,14 @@ function App() {
             {!imageUrl && (
               <div className="placeholder">
                 <p>Please upload an image to start annotating</p>
+                <p className="drag-drop-placeholder">
+                  {isDraggingFile ? "Drop image here" : (
+                    <>
+                      <br />
+                      or drag and drop an image here
+                    </>
+                  )}
+                </p>
               </div>
             )}
           </div>
@@ -389,11 +433,11 @@ function App() {
       <footer className="footer">
         <p>Image Annotation Tool - Home assignment for ProtexAI</p>
         <p className="instructions">
-          <strong>Instructions:</strong> Select a mode (Polygon/Arrow), click on
-          the image to create annotations. Use Select mode to edit or move
-          annotations. Select a point and press Delete key or use Delete Point button
-          to remove individual polygon points. Press Enter to complete a polygon or
-          to finish moving an object.
+          <strong>Instructions:</strong> Upload an image using the button or drag-and-drop.
+          Select a mode (Polygon/Arrow), click on the image to create annotations. 
+          Use Select mode to edit or move annotations. Select a point and press Delete key 
+          or use Delete Point button to remove individual polygon points. 
+          Press Enter to complete a polygon or to finish moving an object.
         </p>
       </footer>
     </div>
