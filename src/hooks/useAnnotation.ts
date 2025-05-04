@@ -36,6 +36,7 @@ interface UseAnnotationReturn {
   setMode: (mode: AnnotationMode) => void;
   resetAnnotation: () => void;
   deleteSelectedAnnotation: () => void;
+  deleteSelectedPoint: () => void;
   exportAnnotations: () => ExportedAnnotations;
   exportAnnotationsAsImage: () => string;
   undo: () => void;
@@ -363,6 +364,55 @@ export const useAnnotation = ({
     }
   }, [selectedAnnotation]);
 
+  const deleteSelectedPoint = useCallback(() => {
+    if (selectedAnnotation && selectedPointIndex !== null) {
+      if (
+        selectedAnnotation.type === AnnotationType.POLYGON &&
+        selectedAnnotation.points.length > 3
+      ) {
+        setAnnotations((prevAnnotations) =>
+          prevAnnotations.map((annotation) => {
+            if (annotation.id === selectedAnnotation.id) {
+              const newPoints = [...annotation.points];
+              newPoints.splice(selectedPointIndex, 1);
+              return { ...annotation, points: newPoints };
+            }
+            return annotation;
+          })
+        );
+        setSelectedPointIndex(null);
+      }
+    }
+  }, [selectedAnnotation, selectedPointIndex]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedAnnotation) {
+          if (
+            selectedPointIndex !== null &&
+            selectedAnnotation.type === AnnotationType.POLYGON &&
+            selectedAnnotation.points.length > 3
+          ) {
+            deleteSelectedPoint();
+          } else {
+            deleteSelectedAnnotation();
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [
+    selectedAnnotation,
+    selectedPointIndex,
+    deleteSelectedAnnotation,
+    deleteSelectedPoint,
+  ]);
+
   const exportAnnotations = useCallback((): ExportedAnnotations => {
     if (!imageElement) {
       return {
@@ -524,6 +574,7 @@ export const useAnnotation = ({
     setMode,
     resetAnnotation,
     deleteSelectedAnnotation,
+    deleteSelectedPoint,
     exportAnnotations,
     exportAnnotationsAsImage,
     undo,

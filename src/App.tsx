@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import AnnotationCanvas from "./components/AnnotationCanvas";
 import { useAnnotation } from "./hooks/useAnnotation";
-import { AnnotationMode, Point } from "./types";
+import { AnnotationMode, AnnotationType, Point } from "./types";
 import "./App.css";
 
 function App() {
@@ -30,6 +30,7 @@ function App() {
     setMode,
     resetAnnotation,
     deleteSelectedAnnotation,
+    deleteSelectedPoint,
     exportAnnotations,
     exportAnnotationsAsImage,
     undo,
@@ -229,8 +230,21 @@ function App() {
             onClick={deleteSelectedAnnotation}
             disabled={!selectedAnnotation}
           >
-            Delete
+            Delete Annotation
           </button>
+          
+          <button
+            onClick={deleteSelectedPoint}
+            disabled={
+              !selectedAnnotation || 
+              !(selectedAnnotation.type === AnnotationType.POLYGON && 
+              selectedAnnotation.points.length > 3)
+            }
+            title="Delete selected point (works when a point is selected and polygon has more than 3 points)"
+          >
+            Delete Point
+          </button>
+
           <div className="history-controls">
             <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
               Undo
@@ -377,8 +391,9 @@ function App() {
         <p className="instructions">
           <strong>Instructions:</strong> Select a mode (Polygon/Arrow), click on
           the image to create annotations. Use Select mode to edit or move
-          annotations. Press Enter to complete a polygon or to finish moving an
-          object.
+          annotations. Select a point and press Delete key or use Delete Point button
+          to remove individual polygon points. Press Enter to complete a polygon or
+          to finish moving an object.
         </p>
       </footer>
     </div>
