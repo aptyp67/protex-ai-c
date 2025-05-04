@@ -28,6 +28,8 @@ export const createArrowAnnotation = (
   };
 };
 
+// Converts display coordinates back to actual image coordinates
+// This is critical for ensuring that annotations work properly across different screen resolutions
 export const calculateScaledPoint = (
   point: Point,
   imageWidth: number,
@@ -41,6 +43,8 @@ export const calculateScaledPoint = (
   };
 };
 
+// Threshold detection for clicking near points
+// zoomLevel adjusts the hitbox size when zoomed in/out
 export const isPointNearPoint = (
   p1: Point,
   p2: Point,
@@ -52,6 +56,9 @@ export const isPointNearPoint = (
   return Math.sqrt(dx * dx + dy * dy) <= threshold / zoomLevel;
 };
 
+// Ray casting algorithm for detecting if a point is inside a polygon
+// Casts a ray from point to infinity and counts intersections with polygon edges
+// Odd number of intersections = inside, even = outside
 export const isPointInPolygon = (point: Point, polygon: Point[]): boolean => {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -70,6 +77,8 @@ export const isPointInPolygon = (point: Point, polygon: Point[]): boolean => {
   return inside;
 };
 
+// Determines if a point is near a line segment using point-to-line distance formula
+// Used for selecting arrow annotations by clicking near the line
 export const isPointNearLine = (
   point: Point,
   lineStart: Point,
@@ -83,19 +92,24 @@ export const isPointNearLine = (
 
   if (lineLength === 0) return isPointNearPoint(point, lineStart, threshold, zoomLevel);
 
+  // Project the point onto the line to find the closest point
+  // t represents how far along the line the closest point is (0-1)
   const t =
     ((point.x - lineStart.x) * (lineEnd.x - lineStart.x) +
       (point.y - lineStart.y) * (lineEnd.y - lineStart.y)) /
     (lineLength * lineLength);
 
+  // If t<0, closest point is before the line start
   if (t < 0) {
     return isPointNearPoint(point, lineStart, threshold, zoomLevel);
   }
 
+  // If t>1, closest point is after the line end
   if (t > 1) {
     return isPointNearPoint(point, lineEnd, threshold, zoomLevel);
   }
 
+  // Calculate the closest point on the line
   const closestPoint = {
     x: lineStart.x + t * (lineEnd.x - lineStart.x),
     y: lineStart.y + t * (lineEnd.y - lineStart.y),
@@ -108,6 +122,7 @@ export const calculateAngle = (p1: Point, p2: Point): number => {
   return Math.atan2(p2.y - p1.y, p2.x - p1.x);
 };
 
+// Creates three points that form the arrowhead at the end of an arrow
 export const calculateArrowHead = (
   start: Point,
   end: Point,
@@ -141,6 +156,8 @@ export const findSelectedPointIndex = (
   return -1;
 };
 
+// Generates a consistent key for storing annotations across sessions
+// Uses both filename and dimensions to handle same filename with different resolutions
 export const generateImageKey = (
   imageUrl: string,
   width: number,

@@ -6,6 +6,8 @@ interface ExportControlsProps {
   handleExport: () => void;
 }
 
+// Component for selecting export format and triggering export
+// Per requirements, we support both JSON (with coordinates) and Image export formats
 const ExportControls: React.FC<ExportControlsProps> = ({
   exportType,
   setExportType,

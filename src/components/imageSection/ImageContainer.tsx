@@ -26,6 +26,8 @@ interface ImageContainerProps {
   mode: AnnotationMode;
 }
 
+// This component handles both the image display and the annotation interactions
+// It's a critical component that serves as the main work area for creating annotations
 const ImageContainer: React.FC<ImageContainerProps> = ({
   imageUrl,
   imageRef,
@@ -63,12 +65,16 @@ const ImageContainer: React.FC<ImageContainerProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleImageContainerMouseUp}
         onMouseLeave={() => {
+          // Important to clear mouse position and stop dragging when mouse leaves the container
+          // Prevents weird behavior when mouse returns to container
           setUnscaledMousePosition(null);
           handleImageContainerMouseUp();
         }}
         onWheel={handleWheel}
         style={{
           ...getCursorStyle(),
+          // Transform scale is applied to the container instead of individual elements
+          // This ensures all child elements (image and annotations) zoom together
           transform: `scale(${zoomLevel})`,
           transformOrigin: "center center",
         }}
@@ -80,13 +86,14 @@ const ImageContainer: React.FC<ImageContainerProps> = ({
               src={imageUrl}
               alt="Uploaded for annotation"
               onLoad={handleImageLoadAndDimensions}
-              draggable={false}
+              draggable={false} // Prevents browser's default drag behavior
               style={{
                 display: "block",
                 width: "100%",
                 height: "100%",
               }}
             />
+            {/* Canvas is positioned absolutely on top of the image */}
             <AnnotationCanvas
               containerWidth={imageContainerDimensions.width}
               containerHeight={imageContainerDimensions.height}
@@ -109,6 +116,8 @@ interface EmptyPlaceholderProps {
   isDraggingFile: boolean;
 }
 
+// Simple placeholder shown when no image is loaded
+// Changes appearance when a file is being dragged over
 const EmptyPlaceholder: React.FC<EmptyPlaceholderProps> = ({ isDraggingFile }) => {
   return (
     <div className="placeholder">

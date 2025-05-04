@@ -23,11 +23,14 @@ function App() {
     useState<Point | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
 
+  // Track the actual dimensions of the image container for proper scaling
   const [imageContainerDimensions, setImageContainerDimensions] = useState({
     width: 0,
     height: 0,
   });
 
+  // The useAnnotation hook contains most of the annotation logic
+  // This separation keeps the UI component cleaner and more focused
   const {
     annotations,
     tempPoints,
@@ -64,6 +67,8 @@ function App() {
     containerHeight: imageContainerDimensions.height,
   });
 
+  // Track image dimensions with both window resize and ResizeObserver
+  // This ensures annotations scale properly when window resizes or zoom changes
   useEffect(() => {
     const currentImageRef = imageRef.current;
 
@@ -83,6 +88,8 @@ function App() {
 
     window.addEventListener("resize", updateDimensions);
 
+    // ResizeObserver is more reliable for tracking element size changes
+    // not triggered by window resize events (like zoom changes)
     let resizeObserver: ResizeObserver | null = null;
     if (currentImageRef) {
       resizeObserver = new ResizeObserver(updateDimensions);
@@ -116,6 +123,7 @@ function App() {
     setImageUrl(newImageUrl);
   };
 
+  // Drag and drop file handling
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -141,6 +149,7 @@ function App() {
     }
   };
 
+  // Clean up object URLs to prevent memory leaks
   useEffect(() => {
     return () => {
       if (imageUrl) {
@@ -149,6 +158,7 @@ function App() {
     };
   }, [imageUrl]);
 
+  // Handle export requests by preparing data in the selected format
   const handleExport = () => {
     setIsExporting(true);
     if (exportType === "json") {
@@ -167,6 +177,8 @@ function App() {
     handleImageContainerMouseMove(e);
   };
 
+  // Global keyboard shortcuts for common operations
+  // Improves usability for keyboard-oriented users
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Delete" || e.key === "Backspace") {
@@ -188,6 +200,7 @@ function App() {
         }
       }
 
+      // Undo/Redo keyboard shortcuts
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
         e.preventDefault();
         if (canUndo) undo();
@@ -201,6 +214,7 @@ function App() {
         if (canRedo) redo();
       }
 
+      // Zoom keyboard shortcuts
       if ((e.ctrlKey || e.metaKey) && e.key === "=") {
         e.preventDefault();
         zoomIn();
@@ -237,6 +251,7 @@ function App() {
     resetZoom,
   ]);
 
+  // Change cursor style based on current annotation mode
   const getCursorStyle = (): React.CSSProperties => {
     if (!imageUrl) return {};
 

@@ -1,32 +1,43 @@
 # Image Annotation Builder
 
-A responsive web application for annotating images with polygons and directional arrows. This tool allows users to upload images and create annotations that can be used for marking regions of interest within images, creating structured data for training machine learning models, and highlighting areas of interest to humans and AI models.
+A responsive web application for annotating images with polygons and directional arrows. This tool allows users to upload images and create annotations that mark regions of interest within images. These annotations create structured data that can be used for training machine learning models in computer vision tasks or highlighting areas of interest to humans and AI models.
+
+## Project Overview
+
+The Image Annotation Builder was built to provide a simple yet powerful interface for creating pixel-precise annotations on images. The application follows a component-based architecture using React and TypeScript, with a focus on maintaining proper coordinate transformations across different screen resolutions and zoom levels.
+
+### Architecture
+
+- **Core Logic**: Separated into custom React hooks (`useAnnotation`) that handle the complex state management and coordinate transformations
+- **Component Structure**: UI components are organized by functionality (header, image handling, export controls)
+- **Rendering Layer**: Uses HTML5 Canvas for efficient rendering of annotations as an overlay on top of images
+- **Persistence**: Annotations are automatically saved to browser localStorage, allowing users to return to their work
 
 ## Features
 
-- **Basic Image Upload**: Upload images via file input
+- **Image Upload**: Upload images via file input or drag-and-drop interface
 - **Annotation Modes**:
   - **Polygon Mode**: Create closed polygons by clicking multiple points on the image
   - **Arrow Mode**: Define directional arrows by selecting start and end points
   - **Select Mode**: Select, move and edit existing annotations
-- **Scaling and Aspect Ratio Independence**: Annotations scale correctly when the image is resized
-- **Interactive Features**:
-  - Edit annotations by dragging points
+- **Advanced Editing**:
+  - Edit annotations by dragging control points
   - Move entire annotations by selecting and dragging
-  - Delete annotations with delete key or delete button
-  - Highlight selected annotations
+  - Delete annotations or individual points with delete key or buttons
+  - Highlight selected annotations for easy identification
+- **Zoom & Pan**: Zoom in/out for detailed annotations with keyboard shortcuts and UI controls
 - **Responsive Design**: Fully responsive for both desktop and mobile devices
 - **Export Options**:
-  - Export annotations as JSON with Cartesian coordinates
-  - Export as an annotated image with annotations applied
+  - Export annotations as JSON with both pixel and normalized coordinates
+  - Export as an annotated image with annotations visually applied
 
 ## Tech Stack
 
-- **React**: UI library for building the application
-- **TypeScript**: Type-safe JavaScript
+- **React 19**: UI library for building the application
+- **TypeScript**: Type-safe JavaScript for better development experience
 - **HTML5 Canvas**: Used for drawing and manipulating annotations
 - **CSS3**: Styling with responsive design
-- **Vite**: Build tool for fast development and optimal production build
+- **Vite**: Modern build tool for fast development and optimal production bundles
 
 ## Running the Application
 
@@ -40,8 +51,8 @@ A responsive web application for annotating images with polygons and directional
 1. Clone the repository
 
 ```bash
-git clone [repository-url]
-cd [repository-name]
+git clone https://github.com/aptyp67/protex-ai-c.git
+cd protex-ai-c
 ```
 
 2. Install dependencies
@@ -68,11 +79,11 @@ The build artifacts will be located in the `dist` directory.
 
 ## How to Use
 
-1. **Upload an Image**: Click the "Upload Image" button and select an image from your device.
+1. **Upload an Image**: Click the "Upload Image" button and select an image from your device, or drag and drop an image onto the application.
 
 2. **Choose an Annotation Mode**:
 
-   - **Polygon**: Click multiple points on the image to create a polygon. To complete the polygon, click near the first point.
+   - **Polygon**: Click multiple points on the image to create a polygon. To complete the polygon, click near the first point or press the Enter key.
    - **Arrow**: Click to set the starting point, then click again to set the end point and create the arrow.
    - **Select**: Click on annotations or their control points to select and edit them.
 
@@ -81,32 +92,35 @@ The build artifacts will be located in the `dist` directory.
    - Move individual points by selecting and dragging them
    - Move entire annotations by selecting and dragging the annotation
    - Delete annotations by selecting them and pressing Delete key or clicking the Delete button
+   - Delete individual polygon points by selecting a point and pressing Delete (minimum 3 points required)
+   - Use keyboard shortcuts (Ctrl+Z/Ctrl+Y) for undo/redo
 
-4. **Export Annotations**:
-   - Choose JSON format to get structured data representation
+4. **Zoom and Navigate**:
+   - Use the zoom controls or Ctrl+Mouse wheel to zoom in and out
+   - Ctrl+0 resets zoom to 100%
+
+5. **Export Annotations**:
+   - Choose JSON format to get structured data representation with both pixel and normalized coordinates
    - Choose Image format to get a static image with annotations applied
    - Click "Download" to save the exported file to your device
 
 ## Implementation Details
 
-### Polygon Annotation
+### Coordinate System and Scaling
 
-Polygon annotations are created by clicking multiple points on the image to define a closed shape. The points are stored as coordinates relative to the image dimensions, allowing the annotations to scale correctly when the image is resized.
+All annotations use a Cartesian coordinate system with the origin (0,0) at the top-left corner of the image. When exporting, coordinates are provided in two formats:
+- Pixel coordinates relative to the original image dimensions
+- Normalized coordinates (0-1 range) to make annotations usable on different image resolutions
 
-### Arrow (Direction) Annotation
+The application maintains proper scaling of annotations when:
+- The browser window is resized
+- The image is viewed on different screen sizes
+- The zoom level is changed
 
-Arrow annotations consist of two points: a start point and an end point. The direction is indicated by an arrow head drawn at the end point. Like polygons, arrow annotations scale with the image.
+### Local Storage Persistence
 
-### Coordinate System
-
-All annotations use a Cartesian coordinate system where:
-
-- The origin (0,0) is at the top-left corner of the image
-- X increases from left to right
-- Y increases from top to bottom
-
-When exporting annotations, coordinates are provided both in pixels (relative to the current view) and in normalized form (0-1 range relative to image dimensions) for compatibility with different image sizes.
+The application automatically saves annotations to the browser's localStorage, indexed by a unique key generated from the image name and dimensions. This allows users to return to their work even after closing the browser.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.

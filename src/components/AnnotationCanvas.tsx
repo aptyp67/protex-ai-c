@@ -27,6 +27,8 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // This effect redraws the canvas whenever any of its dependencies change
+  // Canvas is drawn on top of the image as an overlay with transparent background
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || containerWidth === 0 || containerHeight === 0) return;
@@ -41,9 +43,11 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
     const handleSize = 5;
 
+    // Draw all completed annotations
     annotations.forEach((annotation) => {
       const isSelected = selectedAnnotation?.id === annotation.id;
 
+      // Change color for selected annotations to provide visual feedback
       ctx.strokeStyle = isSelected ? "#ff0000" : "#00ff00";
       ctx.lineWidth = isSelected ? 3 : 2;
       ctx.fillStyle = isSelected
@@ -55,6 +59,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
         const pointsToDraw = annotation.points;
 
+        // Draw the polygon path
         ctx.beginPath();
         ctx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
 
@@ -66,6 +71,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         ctx.fill();
         ctx.stroke();
 
+        // Draw control points for selected polygons
         if (isSelected) {
           pointsToDraw.forEach((point) => {
             ctx.beginPath();
@@ -79,11 +85,13 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
         const [start, end] = annotation.points;
 
+        // Draw arrow line
         ctx.beginPath();
         ctx.moveTo(start.x, start.y);
         ctx.lineTo(end.x, end.y);
         ctx.stroke();
 
+        // Draw arrowhead
         const headPoints = calculateArrowHead(start, end, 10);
         ctx.beginPath();
         ctx.moveTo(headPoints[0].x, headPoints[0].y);
@@ -92,6 +100,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         ctx.lineTo(headPoints[2].x, headPoints[2].y);
         ctx.stroke();
 
+        // Draw control points for selected arrows
         if (isSelected) {
           [start, end].forEach((point) => {
             ctx.beginPath();
@@ -103,6 +112,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       }
     });
 
+    // Draw in-progress annotations (points that are being placed but not yet completed)
     if (tempPoints.length > 0) {
       ctx.strokeStyle = "#00ffff";
       ctx.lineWidth = 2;
@@ -116,6 +126,8 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         ctx.lineTo(point.x, point.y);
       });
 
+      // Show a "preview" line from the last placed point to the current mouse position
+      // This gives visual feedback while creating annotations
       if (currentMousePosition && tempPoints.length > 0) {
         const mouseX = currentMousePosition.x;
         const mouseY = currentMousePosition.y;
@@ -129,6 +141,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
       ctx.stroke();
 
+      // Draw temporary control points
       pointsToDraw.forEach((point) => {
         ctx.beginPath();
         ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
@@ -157,7 +170,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         position: "absolute",
         top: 0,
         left: 0,
-        pointerEvents: "none",
+        pointerEvents: "none", // Important: lets mouse events pass through to the image underneath
         width: `${containerWidth}px`,
         height: `${containerHeight}px`,
       }}

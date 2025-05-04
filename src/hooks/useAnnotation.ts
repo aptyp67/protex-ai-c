@@ -72,6 +72,8 @@ interface AnnotationHistoryState {
   selectedPointIndex: number | null;
 }
 
+// Storage key prefix for local browser persistence
+// Ensures our annotations don't conflict with other stored items
 const STORAGE_KEY_PREFIX = "protexai-annotations-";
 
 export const useAnnotation = ({
@@ -98,6 +100,7 @@ export const useAnnotation = ({
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [currentImageKey, setCurrentImageKey] = useState<string | null>(null);
 
+  // History state for undo/redo functionality
   const [history, setHistory] = useState<AnnotationHistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [canUndo, setCanUndo] = useState<boolean>(false);
@@ -109,6 +112,8 @@ export const useAnnotation = ({
   const startDragPointRef = useRef<Point | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // Using ref to avoid stale closures in event handlers
+  // This ensures we always access the latest annotations in callbacks
   const annotationsRef = useRef<Annotation[]>(annotations);
 
   useEffect(() => {
@@ -120,6 +125,8 @@ export const useAnnotation = ({
     setCanRedo(historyIndex < history.length - 1);
   }, [history, historyIndex]);
 
+  // Save annotations to localStorage whenever they change
+  // This provides persistence across page reloads
   useEffect(() => {
     if (currentImageKey && !skipSavingRef.current && annotations.length > 0) {
       const dataToStore: StoredAnnotations = {
@@ -167,6 +174,8 @@ export const useAnnotation = ({
 
   const lastStateRef = useRef<AnnotationHistoryState | null>(null);
 
+  // Track history for undo/redo operations
+  // Only store a new history entry if the state has actually changed
   useEffect(() => {
     if (skipHistoryRef.current) {
       skipHistoryRef.current = false;
@@ -249,6 +258,8 @@ export const useAnnotation = ({
     }
   }, []);
 
+  // Convert mouse coordinates to image-relative coordinates
+  // This is critical for accurate annotation placement regardless of zoom level
   const getRelativeCoordinates = useCallback(
     (e: React.MouseEvent<HTMLDivElement>): Point => {
       if (!e.currentTarget) return { x: 0, y: 0 };
@@ -258,6 +269,7 @@ export const useAnnotation = ({
       const rawX = e.clientX - rect.left;
       const rawY = e.clientY - rect.top;
 
+      // Adjust for zoom level to maintain correct position
       return {
         x: rawX / zoomLevel,
         y: rawY / zoomLevel,
@@ -276,6 +288,8 @@ export const useAnnotation = ({
       setImageNaturalWidth(naturalWidth);
       setImageNaturalHeight(naturalHeight);
 
+      // Generate a unique key for storing annotations based on image properties
+      // This allows us to restore annotations when the same image is loaded again
       let imageKey;
       if (fileName) {
         imageKey = `${fileName}_${naturalWidth}x${naturalHeight}`;
@@ -293,6 +307,8 @@ export const useAnnotation = ({
         if (storedData) {
           const parsedData: StoredAnnotations = JSON.parse(storedData);
 
+          // Only restore annotations if the image dimensions match
+          // This prevents issues with scaled or different versions of images
           if (
             parsedData.naturalWidth === naturalWidth &&
             parsedData.naturalHeight === naturalHeight
@@ -323,6 +339,8 @@ export const useAnnotation = ({
     [fileName]
   );
 
+  // Core click handler for all annotation interactions
+  // Handles different behavior based on the current mode (select, polygon, arrow)
   const handleImageContainerClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const point = getRelativeCoordinates(e);
@@ -332,6 +350,7 @@ export const useAnnotation = ({
         setTempPoints((prevPoints) => {
           const newTempPoints = [...prevPoints, point];
 
+          // Check if we're closing the polygon (clicking near first point)
           if (
             prevPoints.length > 1 &&
             isPointNearPoint(point, prevPoints[0], 10, zoomLevel)
@@ -363,6 +382,7 @@ export const useAnnotation = ({
       } else if (mode === AnnotationMode.SELECT) {
         let found = false;
 
+        // First, check if user clicked on a control point
         for (let i = 0; i < currentAnnotations.length; i++) {
           const annotation = currentAnnotations[i];
           for (let j = 0; j < annotation.points.length; j++) {
@@ -376,6 +396,7 @@ export const useAnnotation = ({
           if (found) break;
         }
 
+        // If not a control point, check if clicked inside polygon or on arrow line
         if (!found) {
           for (let i = 0; i < currentAnnotations.length; i++) {
             const annotation = currentAnnotations[i];
@@ -419,6 +440,7 @@ export const useAnnotation = ({
     [mode, getRelativeCoordinates, zoomLevel]
   );
 
+  // Handle mouse movement for dragging annotations or control points
   const handleImageContainerMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (mode === AnnotationMode.SELECT && isDragging) {
@@ -429,6 +451,7 @@ export const useAnnotation = ({
         const dx = currentPoint.x - startDragPointRef.current.x;
         const dy = currentPoint.y - startDragPointRef.current.y;
 
+        // If a specific point is selected, move only that point
         if (selectedPointIndex !== null) {
           setAnnotations((prevAnnotations) =>
             prevAnnotations.map((annotation) => {
@@ -444,6 +467,7 @@ export const useAnnotation = ({
             })
           );
         } else {
+          // Otherwise move the entire annotation
           setAnnotations((prevAnnotations) =>
             prevAnnotations.map((annotation) => {
               if (annotation.id === selectedAnnotation.id) {
@@ -493,6 +517,8 @@ export const useAnnotation = ({
     }
   }, [selectedAnnotation]);
 
+  // Allow deleting individual points from polygons
+  // Maintains minimum of 3 points for a valid polygon
   const deleteSelectedPoint = useCallback(() => {
     if (selectedAnnotation && selectedPointIndex !== null) {
       if (
@@ -542,6 +568,8 @@ export const useAnnotation = ({
     deleteSelectedPoint,
   ]);
 
+  // Export annotations in a structured JSON format
+  // Includes both pixel coordinates and normalized (0-1) coordinates
   const exportAnnotations = useCallback((): ExportedAnnotations => {
     if (!imageElement || containerWidth === 0 || containerHeight === 0) {
       return {
@@ -561,6 +589,8 @@ export const useAnnotation = ({
 
     const currentAnnotations = annotationsRef.current;
 
+    // Convert relative coordinates to actual pixel coordinates and normalized coordinates
+    // This makes annotations usable in various contexts regardless of image size
     const exportedAnnotations = currentAnnotations.map((annotation) => {
       const exportedPoints = annotation.points.map((point) => {
         const pixelCoordinates = calculateScaledPoint(
@@ -571,11 +601,13 @@ export const useAnnotation = ({
           currentUnscaledHeight
         );
 
+        // Normalize to 0-1 range for resolution independence
         const normalizedCoordinates = {
           x: pixelCoordinates.x / imageNaturalWidth,
           y: pixelCoordinates.y / imageNaturalHeight,
         };
 
+        // Clamp values to valid range
         normalizedCoordinates.x = Math.max(
           0,
           Math.min(1, normalizedCoordinates.x)
@@ -616,12 +648,15 @@ export const useAnnotation = ({
     containerHeight,
   ]);
 
+  // Export annotations as an image with overlays
+  // Uses HTML Canvas to render the image with annotations drawn on top
   const exportAnnotationsAsImage = useCallback((): string => {
     if (!imageElement || containerWidth === 0 || containerHeight === 0)
       return "";
 
     const currentAnnotations = annotationsRef.current;
 
+    // Create an offscreen canvas for rendering
     if (!canvasRef.current) {
       canvasRef.current = document.createElement("canvas");
     }
@@ -630,15 +665,19 @@ export const useAnnotation = ({
     const ctx = canvas.getContext("2d");
     if (!ctx) return "";
 
+    // Use the image's natural dimensions for the exported image
     canvas.width = imageNaturalWidth;
     canvas.height = imageNaturalHeight;
 
+    // Draw the original image first
     ctx.drawImage(imageElement, 0, 0, imageNaturalWidth, imageNaturalHeight);
 
     const currentUnscaledWidth = containerWidth;
     const currentUnscaledHeight = containerHeight;
 
+    // Draw each annotation on top of the image
     currentAnnotations.forEach((annotation) => {
+      // Scale annotation points to match the original image dimensions
       const scaledPoints = annotation.points.map((point) =>
         calculateScaledPoint(
           point,
@@ -671,6 +710,7 @@ export const useAnnotation = ({
           ctx.lineTo(end.x, end.y);
           ctx.stroke();
 
+          // Draw the arrowhead
           const angle = Math.atan2(end.y - start.y, end.x - start.x);
           const headLength = 15;
 
@@ -699,6 +739,8 @@ export const useAnnotation = ({
     containerHeight,
   ]);
 
+  // Complete the current polygon being drawn
+  // Called when user presses Enter or clicks the Finish button
   const completePolygon = useCallback(() => {
     if (mode === AnnotationMode.POLYGON && tempPoints.length >= 3) {
       const newPolygonAnnotation = createPolygonAnnotation(tempPoints);
@@ -708,6 +750,7 @@ export const useAnnotation = ({
     }
   }, [mode, tempPoints]);
 
+  // Clear all annotations for the current image
   const clearAllAnnotations = useCallback(() => {
     setAnnotations([]);
     setTempPoints([]);

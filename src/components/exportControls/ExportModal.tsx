@@ -11,6 +11,9 @@ const ExportModal: React.FC<ExportModalProps> = ({
   exportedData,
   setIsExporting,
 }) => {
+  // Handles browser download of exported data
+  // For JSON: creates a blob and triggers download
+  // For images: directly uses the dataURL from canvas.toDataURL() 
   const handleDownload = () => {
     if (exportType === "json") {
       const blob = new Blob([exportedData], {
@@ -21,8 +24,9 @@ const ExportModal: React.FC<ExportModalProps> = ({
       a.href = url;
       a.download = "annotations.json";
       a.click();
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(url); // Clean up to avoid memory leaks
     } else {
+      // For image type, exportedData is already a data URL
       const a = document.createElement("a");
       a.href = exportedData;
       a.download = "annotated-image.png";
